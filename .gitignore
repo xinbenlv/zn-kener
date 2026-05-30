@@ -35,3 +35,4 @@ temp.js
 knip-output.txt
 check-output.txt
 translation-report.json
+.worktrees/

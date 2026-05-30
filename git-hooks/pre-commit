@@ -1,0 +1,3 @@
+#!/bin/sh
+# CPQ pre-commit hook: warn when CPQ governance files are staged.
+exec node scripts/cpq-checks.mjs pre-commit

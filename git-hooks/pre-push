@@ -1,0 +1,3 @@
+#!/bin/sh
+# CPQ pre-push hook: full queue verification gate.
+exec node scripts/cpq-checks.mjs verify
