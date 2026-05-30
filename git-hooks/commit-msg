@@ -1,0 +1,3 @@
+#!/bin/sh
+# CPQ commit-msg hook: validate carried-commit message shape.
+exec node scripts/cpq-checks.mjs commit-msg "$1"
