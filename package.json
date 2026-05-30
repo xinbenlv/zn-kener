@@ -1,11 +1,18 @@
 {
-  "name": "kener",
+  "name": "zn-kener",
   "version": "4.0.23",
   "type": "module",
   "private": false,
   "license": "MIT",
-  "description": "Kener is a modern, open-source status page application built with Node.js. It provides real-time monitoring, uptime tracking, incident management, and beautiful dashboards. Perfect for DevOps teams, SaaS providers, and businesses needing reliable service status communication with minimal setup.",
+  "description": "zn-kener is a CPQ-managed fork of Kener (rajnandan1/kener) that makes every admin-UI operation fully drivable through the v4 REST API, secured by per-key RBAC. Tracks upstream Kener and carries a linear queue of local patches.",
   "author": "Raj Nandan Sharma <rajnandan1@gmail.com>",
+  "contributors": [
+    "Zainan Victor Zhou <zzn@d3serve.xyz>"
+  ],
+  "fork": {
+    "upstream": "https://github.com/rajnandan1/kener",
+    "upstreamVersion": "4.0.23"
+  },
   "keywords": [
     "status page",
     "uptime monitoring",
@@ -25,8 +32,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/rajnandan1/kener.git"
+    "url": "https://github.com/xinbenlv/zn-kener.git"
   },
+  "homepage": "https://github.com/xinbenlv/zn-kener#readme",
   "scripts": {
     "build": "node scripts/build-sveltekit.js && node scripts/build-server.js",
     "build-with-docs": "node scripts/build-sveltekit.js --with-docs && node scripts/build-server.js",
