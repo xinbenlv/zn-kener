@@ -1,6 +1,12 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import db from "$lib/server/db/db";
-import type { GetMaintenanceEventsListResponse, MaintenanceEventResponse } from "$lib/types/api";
+import { CreateMaintenanceEvent } from "$lib/server/controllers/maintenanceController";
+import type {
+  GetMaintenanceEventsListResponse,
+  MaintenanceEventResponse,
+  CreateMaintenanceEventRequest,
+  BadRequestResponse,
+} from "$lib/types/api";
 
 function formatDateToISO(date: Date | string): string {
   if (date instanceof Date) {
@@ -48,4 +54,42 @@ export const GET: RequestHandler = async ({ locals, url }) => {
   };
 
   return json(response);
+};
+
+// zn-kener fork (cpq-cornerstone-10): create a maintenance event directly.
+// POST /api/v4/maintenances/{maintenance_id}/events (maintenances.write)
+export const POST: RequestHandler = async ({ locals, request }) => {
+  const maintenance = locals.maintenance!;
+
+  let body: CreateMaintenanceEventRequest;
+  try {
+    body = await request.json();
+  } catch {
+    const err: BadRequestResponse = { error: { code: "BAD_REQUEST", message: "Invalid JSON body" } };
+    return json(err, { status: 400 });
+  }
+
+  if (typeof body.start_date_time !== "number" || typeof body.end_date_time !== "number") {
+    const err: BadRequestResponse = {
+      error: { code: "BAD_REQUEST", message: "start_date_time and end_date_time (UTC seconds) are required" },
+    };
+    return json(err, { status: 400 });
+  }
+
+  const event = await CreateMaintenanceEvent({
+    maintenance_id: maintenance.id,
+    start_date_time: body.start_date_time,
+    end_date_time: body.end_date_time,
+  });
+
+  const eventResponse: MaintenanceEventResponse = {
+    id: event.id,
+    maintenance_id: event.maintenance_id,
+    start_date_time: event.start_date_time,
+    end_date_time: event.end_date_time,
+    status: event.status as "SCHEDULED" | "ONGOING" | "COMPLETED" | "CANCELLED",
+    created_at: formatDateToISO(event.created_at),
+    updated_at: formatDateToISO(event.updated_at),
+  };
+  return json({ event: eventResponse }, { status: 201 });
 };

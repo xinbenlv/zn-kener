@@ -5,6 +5,7 @@ import type {
   MonitoringDataPoint,
   UpdateMonitoringDataRangeRequest,
   UpdateMonitoringDataRangeResponse,
+  DeleteMonitorDataResponse,
   BadRequestResponse,
 } from "$lib/types/api";
 import GC from "$lib/global-constants";
@@ -182,5 +183,31 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
     updated_count: updatedCount,
   };
 
+  return json(response);
+};
+
+// zn-kener fork (cpq-cornerstone-10): delete monitoring data for a monitor.
+// DELETE /api/v4/monitors/{monitor_tag}/data?start=&end=  -> delete rows in range (monitors.write).
+// Omitting both start and end deletes all data for the monitor.
+export const DELETE: RequestHandler = async ({ locals, url }) => {
+  const monitor = locals.monitor!;
+  const startRaw = url.searchParams.get("start");
+  const endRaw = url.searchParams.get("end");
+  const start = startRaw !== null ? Number(startRaw) : undefined;
+  const end = endRaw !== null ? Number(endRaw) : undefined;
+
+  if ((startRaw !== null && Number.isNaN(start)) || (endRaw !== null && Number.isNaN(end))) {
+    const errorResponse: BadRequestResponse = {
+      error: { code: "BAD_REQUEST", message: "start and end must be valid UTC-second integers" },
+    };
+    return json(errorResponse, { status: 400 });
+  }
+
+  const deletedCount = await db.deleteMonitorDataByTag(monitor.tag, start, end);
+
+  const response: DeleteMonitorDataResponse = {
+    message: `Deleted ${deletedCount} monitoring data point(s) for '${monitor.tag}'`,
+    deleted_count: deletedCount,
+  };
   return json(response);
 };
