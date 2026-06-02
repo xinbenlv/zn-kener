@@ -626,6 +626,12 @@ async function removeTagFromGroupMonitors(tag: string): Promise<void> {
   }
 }
 
+// zn-kener (patch-feat-pr2-xinbenlv): DELETE /api/v4/monitors/{tag}/data deletes a time
+// range of one monitor's data, like the dashboard's clear-data action.
+export const DeleteMonitorDataInRange = async (tag: string, start?: number, end?: number): Promise<number> => {
+  return await db.deleteMonitorDataByTag(tag, start, end);
+};
+
 export const DeleteMonitorCompletelyUsingTag = async (tag: string): Promise<number> => {
   await db.deleteMonitorDataByTag(tag);
   await db.deleteIncidentMonitorsByTag(tag);
