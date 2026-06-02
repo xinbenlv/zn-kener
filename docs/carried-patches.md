@@ -13,19 +13,21 @@ Both must exist with distinct URLs. The verifier refuses to run otherwise.
 
 ## CPQ layers
 
-- `cpq-cornerstone-N` — local foundation/workflow carries; ascending N (0, 1, 2, ...), no gaps
+- `cpq-cornerstone-N` — local foundation/workflow carries (CPQ tooling, branding, repo plumbing); **not** product features; ascending N (0, 1, 2, ...), no gaps
 - `patch-fix-test-pr<PR>` — upstream-bound test fixes
 - `patch-fix-func-pr<PR>` — upstream-bound functional fixes
-- `patch-feat-pr<PR>` — upstream-bound feature carries
-- `cpq-capstone-N` — top-of-stack branding/metadata carries; **descending N** (K, ..., 1, 0), no gaps; `cpq-capstone-0` is the metadata snapshot and **must be the final commit**
+- `patch-feat-pr<PR>` — upstream-bound feature carries (PR on **upstream**)
+- `patch-feat-pr<N>-<handle>` — **fork-only feature carries** (PR on **origin**); `<handle>` is the origin org/user (here, `xinbenlv`); ascending N by origin PR number, no gaps. Use this for substantial fork features that are not going upstream — they are still features, so they belong in a feature bucket with a real PR (on our fork), not in `cpq-cornerstone-*`.
+- `cpq-capstone-N` — top-of-stack metadata carries; **descending N** (K, ..., 1, 0), no gaps; `cpq-capstone-0` is the metadata snapshot and **must be the final commit**
 
 ## Required queue order (`cpq-base..cpq-head`)
 
 1. Cornerstones — `cpq-cornerstone-0`, `cpq-cornerstone-1`, ...
 2. Test fixes — `patch-fix-test-pr*` ascending by PR number
 3. Functional fixes — `patch-fix-func-pr*` ascending by PR number
-4. Features — `patch-feat-pr*` ascending by PR number
-5. Capstones — `cpq-capstone-K`, ..., `cpq-capstone-2`, `cpq-capstone-1`, `cpq-capstone-0`
+4. Upstream features — `patch-feat-pr*` ascending by PR number
+5. Fork-only features — `patch-feat-pr<N>-<handle>` ascending by origin PR number
+6. Capstones — `cpq-capstone-K`, ..., `cpq-capstone-2`, `cpq-capstone-1`, `cpq-capstone-0`
 
 The verifier (`scripts/cpq-checks.mjs verify`) enforces this order, the no-gap rules, and that `cpq-capstone-0` is the last commit.
 
@@ -42,7 +44,8 @@ The verifier (`scripts/cpq-checks.mjs verify`) enforces this order, the no-gap r
 ## Ledger rules
 
 - `docs/carried-patch-ledger.yaml` records the **current active patch set only**.
-- Keep entries minimal: `id`, `current_commit`, `upstream_pr`.
+- Keep entries minimal: `id`, `current_commit`, `upstream_pr`, `origin_pr`.
+- `upstream_pr` is the upstream PR URL (for `patch-*-pr<N>`) or `null`. `origin_pr` is the origin (fork) PR URL (for `patch-feat-pr<N>-<handle>`) or `null`. A carry never has both.
 - `current_commit` is the 8-character abbreviated SHA for normal patches.
 - `cpq-capstone-0` is special: its ledger entry uses `current_commit: cpq-head`, never a real SHA.
 - Regenerate via `node scripts/cpq-checks.mjs rebuild-ledger` (or as part of `rebuild-capstone`). Do not hand-edit during normal work.
@@ -54,9 +57,10 @@ Every carried commit must have:
 - subject line starting with the patch ID it occupies in the queue (e.g. `patch-feat-pr1234: ...`)
 - YAML frontmatter (`---` ... `---`) declaring:
   - `upstream:` — the URL of the upstream PR, or `null` for fork-only carries
+  - `origin_pr:` — for `patch-feat-pr<N>-<handle>` carries, the URL of the origin (fork) PR; omit or `null` otherwise
   - `files:` — non-empty list of file paths
 - Three required Markdown section headers in the body:
-  - `## Upstream` — human-readable upstream metadata (PR + status, or `Status: fork-only`)
+  - `## Upstream` — human-readable upstream metadata (PR + status, or `Status: fork-only` with the origin PR for fork-only features)
   - `## Summary` — what changed
   - `## Drop condition` — when this carry can be removed
 
