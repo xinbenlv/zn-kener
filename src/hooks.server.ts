@@ -13,6 +13,8 @@ InstallEnvProxy();
 
 const API_ROUTE_GROUP = "/(api)/";
 const API_PATH_PREFIX = "/api/";
+// zn-kener: build provenance is public so a deploy can be checked without a key.
+const PUBLIC_API_ROUTE_IDS = new Set(["/(api)/api/v4/version"]);
 // Incident and maintenance ids are PostgreSQL `integer` columns; a larger id makes the query fail.
 const MAX_ID = 2147483647;
 
@@ -115,7 +117,7 @@ const csrfHandle: Handle = async ({ event, resolve }) => {
 };
 
 const apiAuthHandle: Handle = async ({ event, resolve }) => {
-  if (isApiRequest(event)) {
+  if (isApiRequest(event) && !PUBLIC_API_ROUTE_IDS.has(event.route.id ?? "")) {
     const token = extractBearerToken(event.request.headers.get("authorization"));
     if (!token) return unauthorized("Missing or invalid authorization header");
     const resolvedKey = await ResolveAPIKey(token);

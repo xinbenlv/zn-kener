@@ -73,6 +73,11 @@ RUN mkdir -p database
 #    (avoids EXDEV rename error in overlayfs; clean .svelte-kit so stale
 #    route types don't persist)
 ARG WITH_DOCS
+# zn-kener build provenance: the build context has no .git, so pass the commit in.
+# Railway passes service variables with these names as build args.
+ARG CPQ_SHA=
+ARG GIT_COMMIT=
+ARG GIT_BRANCH=
 RUN if [ "$WITH_DOCS" != "true" ]; then \
       rm -rf src/routes/\(docs\) .svelte-kit; \
     fi
