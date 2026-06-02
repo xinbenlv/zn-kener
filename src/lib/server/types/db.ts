@@ -332,6 +332,9 @@ export interface ApiKeyRecord {
   hashed_key: string;
   masked_key: string;
   status: string;
+  // zn-kener RBAC: JSON string[] of permission ids, or null for a
+  // legacy / full-access key. See add_permissions_to_api_keys migration.
+  permissions?: string | null;
   created_at: DbTimestamp;
   updated_at: DbTimestamp;
 }
@@ -341,6 +344,8 @@ export interface ApiKeyRecordInsert {
   hashed_key: string;
   masked_key: string;
   status?: string;
+  // zn-kener RBAC: JSON-encoded permission-id array, or null for full access.
+  permissions?: string | null;
 }
 
 // ============ incidents table ============
