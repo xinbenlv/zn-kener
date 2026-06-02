@@ -1,14 +1,16 @@
 import { json, type Handle } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
-import { VerifyAPIKey } from "$lib/server/controllers/apiController";
+import { ResolveAPIKey } from "$lib/server/controllers/apiController";
 import db from "$lib/server/db/db";
 import type { UnauthorizedResponse, NotFoundResponse } from "$lib/types/api";
 import { GetMonitorsParsed } from "$lib/server/controllers/monitorsController";
+import { requiredPermissionFor, keySatisfies } from "$lib/server/apiPermissions";
 
 const API_PATH_PREFIX = "/api/";
 
-// Paths that don't require authentication
-const PUBLIC_API_PATHS = ["/api/status"];
+// Paths that don't require authentication. /api/version (and the versioned
+// alias) is public so build provenance can be probed without a key — zn-kener.
+const PUBLIC_API_PATHS = ["/api/status", "/api/version", "/api/v4/version"];
 
 // Regex to match routes with monitor_tag parameter
 const MONITOR_TAG_ROUTE_REGEX = /^\/api\/(?:v\d+\/)?monitors\/([^/]+)/;
@@ -108,8 +110,8 @@ const apiAuthHandle: Handle = async ({ event, resolve }) => {
       return json(errorResponse, { status: 401 });
     }
 
-    const isValidKey = await VerifyAPIKey(token);
-    if (!isValidKey) {
+    const resolvedKey = await ResolveAPIKey(token);
+    if (!resolvedKey) {
       const errorResponse: UnauthorizedResponse = {
         error: {
           code: "UNAUTHORIZED",
@@ -117,6 +119,21 @@ const apiAuthHandle: Handle = async ({ event, resolve }) => {
         },
       };
       return json(errorResponse, { status: 401 });
+    }
+    // Attach the authenticated key for downstream handlers.
+    event.locals.apiKey = resolvedKey;
+
+    // RBAC: enforce the key's permission scope for this route + method. A key
+    // with permissions === null is a legacy / full-access key and always passes.
+    const requiredPermission = requiredPermissionFor(pathname, event.request.method);
+    if (!keySatisfies(resolvedKey.permissions, requiredPermission)) {
+      const forbiddenResponse: UnauthorizedResponse = {
+        error: {
+          code: "FORBIDDEN",
+          message: `API key lacks required permission: ${requiredPermission}`,
+        },
+      };
+      return json(forbiddenResponse, { status: 403 });
     }
 
     // Validate monitor tag exists for /api/(vX/)?monitors/:monitor_tag/* routes
@@ -173,7 +190,11 @@ const apiAuthHandle: Handle = async ({ event, resolve }) => {
     // Validate page_path exists for /api/(vX/)?pages/:page_path/* routes
     const pagePath = extractPagePath(pathname);
     if (pagePath) {
-      const page = await db.getPageByPath(pagePath);
+      // zn-kener: the default Home page has an empty page_path (""), which can
+      // never appear as a URL segment. The reserved token "~home" addresses it
+      // so the Home page is editable via the API (upstream issue #716, part 1).
+      const lookupPath = pagePath === "~home" ? "" : pagePath;
+      const page = await db.getPageByPath(lookupPath);
       if (!page) {
         const errorResponse: NotFoundResponse = {
           error: {
