@@ -54,6 +54,12 @@ const CPQ_FILES = new Set([
 // Adapt to your upstream. Used to derive upstream PR URLs from patch IDs.
 const UPSTREAM_PR_PREFIX = 'https://github.com/rajnandan1/kener/pull/';
 
+// zn-kener fork: origin PR prefix for fork-only FEATURE carries, whose ID is
+// `patch-feat-pr<N>-<handle>`. These features are not going upstream; their
+// review/provenance lives on a PR in our own fork (origin). `<handle>` is a
+// human-readable disambiguator (the origin org/user) and must match this repo.
+const ORIGIN_PR_PREFIX = 'https://github.com/xinbenlv/zn-kener/pull/';
+
 const REQUIRED_SECTIONS = ['## Upstream', '## Summary', '## Drop condition'];
 
 const CAPSTONE_HEAD_ID = 'cpq-capstone-0';
@@ -76,7 +82,7 @@ files:
 - Drop only if this repo abandons the current CPQ ledger model entirely.
 `;
 
-const PATCH_ID_REGEX = /^(cpq-cornerstone-(\d+)|patch-fix-test-pr(\d+)|patch-fix-func-pr(\d+)|patch-feat-pr(\d+)|cpq-capstone-(\d+))$/;
+const PATCH_ID_REGEX = /^(cpq-cornerstone-(\d+)|patch-fix-test-pr(\d+)|patch-fix-func-pr(\d+)|patch-feat-pr(\d+)-[a-z0-9][a-z0-9-]*|patch-feat-pr(\d+)|cpq-capstone-(\d+))$/;
 
 function git(args, { check = true } = {}) {
   const proc = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
@@ -143,19 +149,28 @@ function upstreamPrUrl(patchId) {
   return match ? `${UPSTREAM_PR_PREFIX}${match[1]}` : null;
 }
 
+// Origin PR URL for fork-only feature carries (patch-feat-pr<N>-<handle>).
+// Returns null for every other bucket (they have no origin PR).
+function originPrUrl(patchId) {
+  const match = /^patch-feat-pr(\d+)-[a-z0-9][a-z0-9-]*$/.exec(patchId);
+  return match ? `${ORIGIN_PR_PREFIX}${match[1]}` : null;
+}
+
 // Sort key for the canonical queue order.
 //   bucket 0: cpq-cornerstone-N   sub-key = +N (ascending)
 //   bucket 1: patch-fix-test-prN  sub-key = +N
 //   bucket 2: patch-fix-func-prN  sub-key = +N
-//   bucket 3: patch-feat-prN      sub-key = +N
-//   bucket 4: cpq-capstone-N      sub-key = -N (descending; cpq-capstone-0 last)
+//   bucket 3: patch-feat-prN          sub-key = +N (upstream-bound features)
+//   bucket 4: patch-feat-prN-<handle> sub-key = +N (fork-only features, origin PR)
+//   bucket 5: cpq-capstone-N          sub-key = -N (descending; cpq-capstone-0 last)
 function patchSortKey(id) {
   let m;
   if ((m = /^cpq-cornerstone-(\d+)$/.exec(id))) return [0, Number(m[1])];
   if ((m = /^patch-fix-test-pr(\d+)$/.exec(id))) return [1, Number(m[1])];
   if ((m = /^patch-fix-func-pr(\d+)$/.exec(id))) return [2, Number(m[1])];
   if ((m = /^patch-feat-pr(\d+)$/.exec(id))) return [3, Number(m[1])];
-  if ((m = /^cpq-capstone-(\d+)$/.exec(id))) return [4, -Number(m[1])];
+  if ((m = /^patch-feat-pr(\d+)-[a-z0-9][a-z0-9-]*$/.exec(id))) return [4, Number(m[1])];
+  if ((m = /^cpq-capstone-(\d+)$/.exec(id))) return [5, -Number(m[1])];
   return [99, 0];
 }
 
@@ -176,7 +191,7 @@ function verifyQueueOrder(commits) {
     if (compareKeys(keys[i - 1], keys[i]) > 0) {
       throw new Error(
         'invalid CPQ queue order; expected '
-        + 'cornerstones (asc) -> fix-test (asc) -> fix-func (asc) -> feat (asc) -> capstones (desc, capstone-0 last)\n'
+        + 'cornerstones (asc) -> fix-test (asc) -> fix-func (asc) -> feat (asc) -> feat-fork (asc) -> capstones (desc, capstone-0 last)\n'
         + `actual: ${JSON.stringify(ids)}`,
       );
     }
@@ -222,9 +237,11 @@ function writeLedger(filePath, { ensureCapstoneHead = false } = {}) {
   for (const c of commits) {
     const current = c.id === CAPSTONE_HEAD_ID ? 'cpq-head' : c.short;
     const upstream = upstreamPrUrl(c.id) ?? 'null';
+    const origin = originPrUrl(c.id) ?? 'null';
     lines.push(`  - id: ${c.id}`);
     lines.push(`    current_commit: ${current}`);
     lines.push(`    upstream_pr: ${upstream}`);
+    lines.push(`    origin_pr: ${origin}`);
     lines.push('');
   }
   // When called from rebuild-capstone, the snapshot capstone hasn't been
@@ -234,6 +251,7 @@ function writeLedger(filePath, { ensureCapstoneHead = false } = {}) {
     lines.push(`  - id: ${CAPSTONE_HEAD_ID}`);
     lines.push(`    current_commit: cpq-head`);
     lines.push(`    upstream_pr: null`);
+    lines.push(`    origin_pr: null`);
     lines.push('');
   }
   fs.writeFileSync(filePath, `${lines.join('\n').trimEnd()}\n`, 'utf8');
@@ -293,6 +311,9 @@ function parseLedger(filePath) {
     } else if (stripped.startsWith('upstream_pr:')) {
       const value = valueAfter(stripped);
       current.upstream_pr = value === 'null' ? null : value;
+    } else if (stripped.startsWith('origin_pr:')) {
+      const value = valueAfter(stripped);
+      current.origin_pr = value === 'null' ? null : value;
     }
   }
   if (current) entries.push(current);
@@ -398,6 +419,7 @@ function verify() {
   commits.forEach((c, i) => {
     const e = entries[i];
     const expectedUrl = upstreamPrUrl(c.id);
+    const expectedOriginUrl = originPrUrl(c.id);
     if (c.id === CAPSTONE_HEAD_ID) {
       if (e.current_commit !== 'cpq-head') {
         throw new Error(`${CAPSTONE_HEAD_ID} ledger entry must use current_commit: cpq-head`);
@@ -407,6 +429,9 @@ function verify() {
     }
     if ((e.upstream_pr ?? null) !== expectedUrl) {
       throw new Error(`ledger upstream PR mismatch for ${c.id}: expected ${expectedUrl}, got ${e.upstream_pr}`);
+    }
+    if ((e.origin_pr ?? null) !== expectedOriginUrl) {
+      throw new Error(`ledger origin PR mismatch for ${c.id}: expected ${expectedOriginUrl}, got ${e.origin_pr}`);
     }
   });
 
