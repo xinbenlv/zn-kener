@@ -1,7 +1,20 @@
 import * as esbuild from "esbuild";
 import { readFileSync } from "fs";
+import { execSync } from "node:child_process";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf8"));
+
+// zn-kener CPQ build provenance (best-effort; safe fallbacks in non-git env).
+function gitOut(cmd, fallback) {
+  try {
+    return execSync(cmd, { encoding: "utf8" }).trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
+const cpqSha = gitOut("git rev-parse --short=6 HEAD", "dev");
+const gitBranch = gitOut("git rev-parse --abbrev-ref HEAD", "main");
+const buildTime = new Date().toISOString();
 
 // Collect all dependency names to externalize, except CJS packages
 // that need to be bundled for ESM compatibility
@@ -28,6 +41,10 @@ await esbuild.build({
     // Inject version at build time so src/lib/version.ts resolves it
     // without relying on vite-plugin-package-version at runtime
     "import.meta.env.PACKAGE_VERSION": JSON.stringify(pkg.version),
+    // zn-kener CPQ build provenance, consumed by src/lib/buildInfo.ts
+    "import.meta.env.CPQ_SHA": JSON.stringify(cpqSha),
+    "import.meta.env.GIT_BRANCH": JSON.stringify(gitBranch),
+    "import.meta.env.BUILD_TIME": JSON.stringify(buildTime),
   },
   plugins: [
     {
@@ -49,4 +66,4 @@ await esbuild.build({
   },
 });
 
-console.log(`Server build completed: build/main.js (v${pkg.version})`);
+console.log(`Server build completed: build/main.js (zn-kener v${pkg.version}+cpq.${cpqSha}, upstream v${pkg.version}, ${gitBranch})`);
