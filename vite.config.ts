@@ -9,8 +9,18 @@ import { configDefaults } from "vitest/config";
 import { buildCheerioGuest } from "./scripts/cheerio-guest.js";
 
 import * as dotenv from "dotenv";
+import { execSync } from "node:child_process";
 
 dotenv.config();
+
+// zn-kener CPQ build provenance (best-effort; safe fallbacks in non-git env).
+function gitOut(cmd: string, fallback: string): string {
+  try {
+    return execSync(cmd, { encoding: "utf8" }).trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function getAllowedHost(origin: string): string | undefined {
   try {
@@ -60,6 +70,15 @@ export default defineConfig(({ mode }) => {
       __KENER_BUILD_ENV__: JSON.stringify(buildEnv),
       __KENER_IS_PROD__: JSON.stringify(isProduction),
       __CHEERIO_GUEST__: JSON.stringify(buildCheerioGuest()),
+      // zn-kener CPQ build provenance, consumed by src/lib/buildInfo.ts.
+      // (PACKAGE_VERSION is provided by the vite-plugin-package-version plugin.)
+      // Env vars win, so a build without .git (railway up, Docker) still reports its commit.
+      "import.meta.env.CPQ_SHA": JSON.stringify(process.env.CPQ_SHA || gitOut("git rev-parse --short=6 HEAD", "dev")),
+      "import.meta.env.GIT_COMMIT": JSON.stringify(process.env.GIT_COMMIT || gitOut("git rev-parse HEAD", "")),
+      "import.meta.env.GIT_BRANCH": JSON.stringify(
+        process.env.GIT_BRANCH || gitOut("git rev-parse --abbrev-ref HEAD", "main"),
+      ),
+      "import.meta.env.BUILD_TIME": JSON.stringify(new Date().toISOString()),
     },
     test: {
       projects: [
