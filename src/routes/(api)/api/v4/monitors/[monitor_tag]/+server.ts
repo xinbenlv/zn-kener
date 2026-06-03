@@ -1,11 +1,12 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import db from "$lib/server/db/db";
-import { GetMonitorsParsed } from "$lib/server/controllers/monitorsController";
+import { GetMonitorsParsed, DeleteMonitorCompletelyUsingTag } from "$lib/server/controllers/monitorsController";
 import type {
   GetMonitorResponse,
   MonitorResponse,
   UpdateMonitorRequest,
   UpdateMonitorResponse,
+  DeleteMonitorResponse,
   BadRequestResponse,
 } from "$lib/types/api";
 
@@ -139,6 +140,23 @@ export const PATCH: RequestHandler = async ({ locals, request }) => {
 
   const response: UpdateMonitorResponse = {
     monitor: updatedMonitor,
+  };
+
+  return json(response);
+};
+
+export const DELETE: RequestHandler = async ({ locals }) => {
+  // Monitor is validated by middleware and available in locals; RBAC
+  // (monitors.write) is enforced in hooks.server.ts before this runs.
+  const monitor = locals.monitor!;
+
+  // Removes the monitor along with its history, page/incident/maintenance
+  // associations, group membership, alert configs, and caches — the same
+  // cleanup the admin UI's "deleteMonitor" action performs.
+  await DeleteMonitorCompletelyUsingTag(monitor.tag);
+
+  const response: DeleteMonitorResponse = {
+    message: `Monitor '${monitor.tag}' deleted successfully`,
   };
 
   return json(response);
