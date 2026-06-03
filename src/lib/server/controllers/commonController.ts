@@ -123,7 +123,10 @@ export const CookieConfig = (): {
   //get base path from env
   let cookiePath = !!process.env.KENER_BASE_PATH ? process.env.KENER_BASE_PATH : "/";
 
-  let isSecuredDomain = false;
+  // zn-kener multi-origin: when ORIGIN is unset (per-request origin via
+  // PROTOCOL_HEADER/HOST_HEADER), fall back to NODE_ENV to keep the auth cookie
+  // Secure in production instead of silently dropping the Secure flag.
+  let isSecuredDomain = process.env.NODE_ENV === "production";
   if (!!process.env.ORIGIN) {
     isSecuredDomain = process.env.ORIGIN.startsWith("https://");
   }
