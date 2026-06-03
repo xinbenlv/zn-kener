@@ -497,3 +497,192 @@ export interface UpdatePageResponse {
 export interface DeletePageResponse {
   message: string;
 }
+
+export interface DeleteMonitorResponse {
+  message: string;
+}
+
+// ============ API Key management (zn-kener fork) ============
+// Per-key RBAC: `permissions` is the list of permission ids the key is scoped
+// to, or null for a legacy / full-access key.
+export interface ApiKeyListItem {
+  id: number;
+  name: string;
+  masked_key: string;
+  status: string;
+  permissions: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GetApiKeysResponse {
+  api_keys: ApiKeyListItem[];
+}
+
+export interface CreateApiKeyRequest {
+  name: string;
+  // Optional subset of permission ids. Omitted/null/empty => full-access key.
+  permissions?: string[] | null;
+}
+
+export interface CreateApiKeyResponse {
+  // The plaintext key is returned ONCE, at creation time, and never again.
+  api_key: {
+    name: string;
+    key: string;
+    permissions: string[] | null;
+  };
+}
+
+export interface UpdateApiKeyRequest {
+  status: "ACTIVE" | "INACTIVE";
+}
+
+export interface UpdateApiKeyResponse {
+  message: string;
+}
+
+export interface DeleteApiKeyResponse {
+  message: string;
+}
+
+export interface PermissionCatalogItem {
+  id: string;
+  permission_name: string;
+}
+
+export interface GetPermissionsResponse {
+  permissions: PermissionCatalogItem[];
+}
+
+// ============ Trigger management (zn-kener fork) ============
+export interface TriggerResponse {
+  id: number;
+  name: string;
+  trigger_type: string | null;
+  trigger_desc: string | null;
+  trigger_status: string | null;
+  trigger_meta: unknown;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GetTriggersResponse {
+  triggers: TriggerResponse[];
+}
+
+export interface CreateTriggerRequest {
+  name: string;
+  trigger_type: string;
+  trigger_desc?: string | null;
+  trigger_status?: string | null;
+  // Provider-specific config (email/webhook/slack/discord). Stored as JSON.
+  trigger_meta?: unknown;
+}
+
+export interface UpdateTriggerRequest {
+  name?: string;
+  trigger_type?: string | null;
+  trigger_desc?: string | null;
+  trigger_status?: string | null;
+  trigger_meta?: unknown;
+}
+
+// ============ Alert config / alert history management (zn-kener fork) ============
+// Mirrors MonitorAlertConfigCreateInput/UpdateInput in src/lib/server/types/db.ts.
+export interface CreateAlertConfigRequest {
+  monitor_tags: string[];
+  alert_for: "STATUS" | "LATENCY" | "UPTIME";
+  alert_value: string;
+  failure_threshold?: number;
+  success_threshold?: number;
+  alert_description?: string | null;
+  create_incident?: "YES" | "NO";
+  is_active?: "YES" | "NO";
+  severity?: "CRITICAL" | "WARNING";
+  trigger_ids?: number[];
+}
+
+export interface UpdateAlertConfigRequest {
+  monitor_tags?: string[];
+  alert_for?: "STATUS" | "LATENCY" | "UPTIME";
+  alert_value?: string;
+  failure_threshold?: number;
+  success_threshold?: number;
+  alert_description?: string | null;
+  create_incident?: "YES" | "NO";
+  is_active?: "YES" | "NO";
+  severity?: "CRITICAL" | "WARNING";
+  trigger_ids?: number[];
+}
+
+export interface UpdateAlertRequest {
+  alert_status: "TRIGGERED" | "RESOLVED";
+}
+
+// ============ User / role management (zn-kener fork) ============
+export interface CreateUserInviteRequest {
+  email: string;
+  name: string;
+  role_ids: string[];
+}
+
+export interface UpdateUserRequest {
+  role_ids?: string[];
+  // 1 = active, 0 = inactive (matches ManualUpdateUserData is_active contract).
+  is_active?: number;
+}
+
+export interface CreateRoleRequest {
+  id: string;
+  role_name: string;
+  permission_ids?: string[];
+}
+
+export interface UpdateRoleRequest {
+  role_name?: string;
+  status?: string;
+  permission_ids?: string[];
+}
+
+export interface RoleUserRequest {
+  user_id: number;
+}
+
+// ============ Subscriber / email-template management (zn-kener fork) ============
+export interface CreateSubscriberRequest {
+  email: string;
+  incidents?: boolean;
+  maintenances?: boolean;
+}
+
+export interface UpdateSubscriptionRequest {
+  event_type: "incidents" | "maintenances";
+  enabled: boolean;
+}
+
+export interface UpdateEmailTemplateRequest {
+  template_subject?: string | null;
+  template_html_body?: string | null;
+  template_text_body?: string | null;
+}
+
+// ============ Monitor extras / page reorder / maintenance event (zn-kener fork) ============
+export interface DeleteMonitorDataResponse {
+  message: string;
+  deleted_count: number;
+}
+
+export interface CloneMonitorRequest {
+  new_tag: string;
+  new_name: string;
+}
+
+export interface ReorderPageMonitorsRequest {
+  monitor_tags: string[];
+}
+
+export interface CreateMaintenanceEventRequest {
+  start_date_time: number;
+  end_date_time: number;
+}

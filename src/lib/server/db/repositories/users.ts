@@ -195,6 +195,8 @@ export class UsersRepository extends BaseRepository {
       name: data.name,
       hashed_key: data.hashed_key,
       masked_key: data.masked_key,
+      // zn-kener RBAC: null/undefined => full-access key (upstream behavior).
+      permissions: data.permissions ?? null,
       created_at: this.knex.fn.now(),
       updated_at: this.knex.fn.now(),
     });
