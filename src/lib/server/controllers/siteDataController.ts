@@ -142,7 +142,11 @@ export const IsSetupComplete = async (): Promise<boolean> => {
   if (process.env.KENER_SECRET_KEY === undefined) {
     return false;
   }
-  if (process.env.ORIGIN === undefined) {
+  // zn-kener multi-origin: ORIGIN may be intentionally unset when the request
+  // origin is derived per-request from PROTOCOL_HEADER/HOST_HEADER (adapter-node),
+  // so the app can be served from several domains at once. Treat setup as
+  // configured if either a fixed ORIGIN or header-derivation is in effect.
+  if (process.env.ORIGIN === undefined && process.env.HOST_HEADER === undefined) {
     return false;
   }
   if (process.env.REDIS_URL === undefined) {
