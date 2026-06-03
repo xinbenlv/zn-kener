@@ -78,6 +78,15 @@ files:
 - Rebuilds \`docs/carried-patch-ledger.yaml\` from the finalized carried queue.
 - Reasserts that \`cpq-head\` points to the rebuilt \`${CAPSTONE_HEAD_ID}\` metadata snapshot.
 
+## zn-kener stance
+- zn-kener improves Kener by taking the opinionated position that a status
+  page — software people page on at 3am — must ship with automated tests.
+- Upstream Kener carries no test suite. This fork adds one (Vitest): unit
+  tests for the per-key RBAC permission resolver, and functional tests for the
+  API auth/RBAC enforcement layer and the build-provenance endpoint.
+- "No new fork code without tests" is a release gate for this queue going
+  forward; this stance travels with the capstone on every rebuild.
+
 ## Drop condition
 - Drop only if this repo abandons the current CPQ ledger model entirely.
 `;
