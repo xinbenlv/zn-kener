@@ -69,9 +69,48 @@ function isFormContentType(request: Request): boolean {
   return FORM_CONTENT_TYPES.includes(type);
 }
 
+// Documentation link surfaced in the CSRF rejection itself so an operator who
+// hits it learns exactly which env var to set and where it is documented.
+const CSRF_DOCS_URL =
+  "https://github.com/xinbenlv/zn-kener/blob/main/src/routes/(docs)/docs/content/v4/setup/environment-variables.md#multi-origin-deployments";
+
+// zn-kener multi-origin CSRF allowlist.
+//
+// The same-host check below accepts a form POST only when the browser Origin's
+// host equals the per-request derived host (`event.url.host`). That is correct
+// for single-origin deploys, but breaks when ONE deployment is served from
+// several domains AND a proxy in front normalizes the forwarded host to a
+// single canonical value (e.g. Cloudflare → Railway always delivers
+// `x-forwarded-host: <service>.up.railway.app`). Every request then derives
+// that one host, so legitimate POSTs from the other public domains are rejected
+// with "Cross-site ... forbidden".
+//
+// `CSRF_TRUSTED_ORIGINS` is a comma-separated allowlist of additional origins
+// trusted to submit forms regardless of the proxy-derived host. Each entry may
+// be a full origin (`https://status.example.com`) or a bare host
+// (`status.example.com`). Leave it UNSET for single-origin deploys: the set is
+// then empty and behavior is byte-for-byte identical to the upstream same-host
+// check. See CSRF_DOCS_URL.
+function parseTrustedHosts(raw: string | undefined): ReadonlySet<string> {
+  const hosts = new Set<string>();
+  for (const entry of (raw ?? "").split(",")) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    try {
+      hosts.add(new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`).host);
+    } catch {
+      hosts.add(trimmed);
+    }
+  }
+  return hosts;
+}
+const CSRF_TRUSTED_HOSTS = parseTrustedHosts(process.env.CSRF_TRUSTED_ORIGINS);
+
 // Custom CSRF handler: validates Origin when present, allows requests when absent.
 // When Origin is absent (e.g. Referrer-Policy: no-referrer), security relies on
 // SameSite=Lax cookies which prevent cross-site POST from carrying auth cookies.
+// An Origin is accepted when its host matches the per-request derived host OR is
+// listed in CSRF_TRUSTED_ORIGINS (see parseTrustedHosts above).
 const csrfHandle: Handle = async ({ event, resolve }) => {
   const { request } = event;
 
@@ -83,8 +122,13 @@ const csrfHandle: Handle = async ({ event, resolve }) => {
     if (requestOrigin && requestOrigin !== "null") {
       const requestHost = new URL(requestOrigin).host;
       const expectedHost = event.url.host;
-      if (requestHost !== expectedHost) {
-        return new Response(`Cross-site ${request.method} form submissions are forbidden`, { status: 403 });
+      if (requestHost !== expectedHost && !CSRF_TRUSTED_HOSTS.has(requestHost)) {
+        const message =
+          `Cross-site ${request.method} form submissions are forbidden. ` +
+          `If "${requestOrigin}" is an intended origin for this deployment, add it to the ` +
+          `CSRF_TRUSTED_ORIGINS environment variable (comma-separated list of trusted origins). ` +
+          `See ${CSRF_DOCS_URL}`;
+        return new Response(message, { status: 403 });
       }
     }
   }

@@ -92,6 +92,31 @@ ORIGIN=https://example.com
 REDIS_URL=redis://localhost:6379
 ```
 
+## Multi-Origin Deployments {#multi-origin-deployments}
+
+By default Kener trusts a **single** origin for CSRF (form POSTs such as login). To serve **one** deployment from **multiple** domains (e.g. a custom domain plus the platform URL), leave `ORIGIN` unset, derive the origin per request from proxy headers, and list every public origin in `CSRF_TRUSTED_ORIGINS`.
+
+| Variable               | Value                   | Purpose                                |
+| :--------------------- | :---------------------- | :------------------------------------- |
+| `ORIGIN`               | _(unset)_               | Disables the fixed single-origin check |
+| `PROTOCOL_HEADER`      | `x-forwarded-proto`     | Derive the scheme from the proxy       |
+| `HOST_HEADER`          | `x-forwarded-host`      | Derive the host from the proxy         |
+| `CSRF_TRUSTED_ORIGINS` | comma-separated origins | Extra origins trusted to submit forms  |
+
+```bash
+PROTOCOL_HEADER=x-forwarded-proto
+HOST_HEADER=x-forwarded-host
+CSRF_TRUSTED_ORIGINS=https://status.example.com,https://app.up.railway.app
+```
+
+Each `CSRF_TRUSTED_ORIGINS` entry may be a full origin (`https://status.example.com`) or a bare host (`status.example.com`).
+
+> [!IMPORTANT]
+> Set `CSRF_TRUSTED_ORIGINS` whenever a proxy normalizes the forwarded host to a single value — for example Cloudflare in front of Railway sends the **same** `x-forwarded-host` for every domain. Without it, per-request derivation resolves to that one host and logins from the other domains fail with **"Cross-site POST form submissions are forbidden"**. The rejection message names the offending origin and links back to this section.
+
+> [!NOTE]
+> Leave `CSRF_TRUSTED_ORIGINS` unset for single-origin deployments — the allowlist is then empty and CSRF behavior is identical to the default. For a single fixed domain, use `ORIGIN` instead.
+
 ## Optional Variables {#optional-variables}
 
 ### KENER_BASE_PATH {#kener-base-path}
