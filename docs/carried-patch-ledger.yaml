@@ -1,1 +1,55 @@
-patches: []
+patches:
+  - id: cpq-cornerstone-0
+    current_commit: 7bdac294
+    upstream_pr: null
+    origin_pr: null
+
+  - id: cpq-cornerstone-1
+    current_commit: 5337dfba
+    upstream_pr: null
+    origin_pr: null
+
+  - id: cpq-cornerstone-2
+    current_commit: aaee5105
+    upstream_pr: null
+    origin_pr: null
+
+  - id: cpq-cornerstone-3
+    current_commit: ea0d02e3
+    upstream_pr: null
+    origin_pr: null
+
+  - id: patch-feat-pr1-xinbenlv
+    current_commit: 9311cb03
+    upstream_pr: null
+    origin_pr: https://github.com/xinbenlv/zn-kener/pull/1
+
+  - id: patch-feat-pr2-xinbenlv
+    current_commit: e4382536
+    upstream_pr: null
+    origin_pr: https://github.com/xinbenlv/zn-kener/pull/2
+
+  - id: patch-feat-pr3-xinbenlv
+    current_commit: 68d2e6f0
+    upstream_pr: null
+    origin_pr: https://github.com/xinbenlv/zn-kener/pull/3
+
+  - id: patch-feat-pr4-xinbenlv
+    current_commit: 1890492d
+    upstream_pr: null
+    origin_pr: https://github.com/xinbenlv/zn-kener/pull/4
+
+  - id: patch-feat-pr5-xinbenlv
+    current_commit: c3b59ef3
+    upstream_pr: null
+    origin_pr: https://github.com/xinbenlv/zn-kener/pull/5
+
+  - id: patch-feat-pr6-xinbenlv
+    current_commit: c55b05bc
+    upstream_pr: null
+    origin_pr: https://github.com/xinbenlv/zn-kener/pull/6
+
+  - id: cpq-capstone-0
+    current_commit: cpq-head
+    upstream_pr: null
+    origin_pr: null
