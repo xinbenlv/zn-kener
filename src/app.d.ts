@@ -14,6 +14,9 @@ declare global {
       maintenance?: import("$lib/server/types/db").MaintenanceRecord;
       // Set by hooks.server.ts for /api/pages/:page_path/* routes
       page?: import("$lib/server/types/db").PageRecord;
+      // zn-kener RBAC: authenticated API key for the current request. Present
+      // on authenticated /api routes; permissions === null => full-access key.
+      apiKey?: import("$lib/server/controllers/apiController").ResolvedAPIKey;
     }
 
     interface PageData {

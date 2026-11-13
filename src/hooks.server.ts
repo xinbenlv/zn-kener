@@ -1,11 +1,12 @@
 import { json, type Handle, type RequestEvent } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
-import { VerifyAPIKey } from "$lib/server/controllers/apiController";
+import { ResolveAPIKey } from "$lib/server/controllers/apiController";
 import db from "$lib/server/db/db";
 import type { UnauthorizedResponse, NotFoundResponse } from "$lib/types/api";
 import { GetMonitorsParsed } from "$lib/server/controllers/monitorsController";
 import GC from "$lib/global-constants";
 import { InstallEnvProxy } from "$lib/server/proxy";
+import { requiredPermissionFor, keySatisfies } from "$lib/server/apiPermissions";
 
 // Dev runs the SvelteKit server and the scheduler as separate processes; each installs once.
 InstallEnvProxy();
@@ -19,6 +20,22 @@ const MAX_ID = 2147483647;
 // while event.url.pathname still reads "/%61pi/...". The raw path decides only when no route matched.
 function isApiRequest(event: RequestEvent): boolean {
   return event.route.id?.startsWith(API_ROUTE_GROUP) ?? event.url.pathname.startsWith(API_PATH_PREFIX);
+}
+
+// zn-kener per-key RBAC: requiredPermissionFor() maps an /api/ path to a permission id.
+// Give it the path decoded the same way as the SvelteKit router, so "/%61pi/v4/monitors"
+// needs the same permission as "/api/v4/monitors".
+function routedPathname(pathname: string): string {
+  try {
+    return pathname.split("%25").map(decodeURI).join("%25");
+  } catch {
+    return pathname;
+  }
+}
+
+function forbidden(message: string): Response {
+  const body: UnauthorizedResponse = { error: { code: "FORBIDDEN", message } };
+  return json(body, { status: 403 });
 }
 
 function extractBearerToken(authHeader: string | null): string | null {
@@ -101,11 +118,19 @@ const apiAuthHandle: Handle = async ({ event, resolve }) => {
   if (isApiRequest(event)) {
     const token = extractBearerToken(event.request.headers.get("authorization"));
     if (!token) return unauthorized("Missing or invalid authorization header");
-    if (!(await VerifyAPIKey(token))) return unauthorized("Invalid API key");
+    const resolvedKey = await ResolveAPIKey(token);
+    if (!resolvedKey) return unauthorized("Invalid API key");
+    event.locals.apiKey = resolvedKey;
 
     // API consumers must always get JSON; without this, an /api/ path with no
     // matching route falls through to SvelteKit's HTML error page
     if (event.route.id === null) return notFound(`No API route matches '${event.url.pathname}'`);
+
+    // zn-kener per-key RBAC: a key with permissions === null is a full-access key.
+    const requiredPermission = requiredPermissionFor(routedPathname(event.url.pathname), event.request.method);
+    if (!keySatisfies(resolvedKey.permissions, requiredPermission)) {
+      return forbidden(`API key lacks required permission: ${requiredPermission}`);
+    }
 
     const { monitor_tag, incident_id, maintenance_id, page_path } = event.params;
 
