@@ -1,4 +1,4 @@
-import { json, type Handle } from "@sveltejs/kit";
+import { json, type Handle, type RequestEvent } from "@sveltejs/kit";
 import { sequence } from "@sveltejs/kit/hooks";
 import { VerifyAPIKey } from "$lib/server/controllers/apiController";
 import db from "$lib/server/db/db";
@@ -22,8 +22,24 @@ const MAINTENANCE_ID_ROUTE_REGEX = /^\/api\/(?:v\d+\/)?maintenances\/(\d+)/;
 // Regex to match routes with page_path parameter
 const PAGE_PATH_ROUTE_REGEX = /^\/api\/(?:v\d+\/)?pages\/([^/]+)/;
 
-function isApiRoute(pathname: string): boolean {
-  return pathname.startsWith(API_PATH_PREFIX);
+const API_ROUTE_GROUP = "/(api)/";
+
+// Backport of upstream rajnandan1/kener#903 (fixed in v4.1.9, CVSS 9.1):
+// SvelteKit matches routes on the percent-decoded path, so "/%61pi/v4/monitors"
+// reaches an API route while event.url.pathname still reads "/%61pi/...".
+// Decide from the matched route; the raw path decides only when no route matched.
+function isApiRequest(event: RequestEvent): boolean {
+  return event.route?.id?.startsWith(API_ROUTE_GROUP) ?? event.url.pathname.startsWith(API_PATH_PREFIX);
+}
+
+// Decode the path exactly like SvelteKit's router (decodeURI per %25-separated
+// chunk), so the path helpers below see the same path the router matched.
+function routedPathname(pathname: string): string {
+  try {
+    return pathname.split("%25").map(decodeURI).join("%25");
+  } catch {
+    return pathname;
+  }
 }
 
 function isPublicApiPath(pathname: string): boolean {
@@ -91,10 +107,10 @@ const csrfHandle: Handle = async ({ event, resolve }) => {
 };
 
 const apiAuthHandle: Handle = async ({ event, resolve }) => {
-  const { pathname } = event.url;
+  const pathname = routedPathname(event.url.pathname);
 
   // Check if this is an API route that requires authentication
-  if (isApiRoute(pathname) && !isPublicApiPath(pathname)) {
+  if (isApiRequest(event) && !isPublicApiPath(pathname)) {
     const authHeader = event.request.headers.get("authorization");
     const token = extractBearerToken(authHeader);
 
